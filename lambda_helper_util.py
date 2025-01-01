@@ -1,67 +1,100 @@
-def getRequestContext(oEventObject):
-
-    oRequestContext = {
+def get_request_context(event):
+    """
+    Extracts the request context information from the event object.
+    """
+    request_context = {
         "HttpMethod": "",
         "UrlPath": "",
         "UsingFunctionUrl": False
     }
-    if 'requestContext' in oEventObject:
-        if 'http' in oEventObject['requestContext']:
-            oRequestContext["HttpMethod"] = oEventObject['requestContext']['http']['method']
-            oRequestContext["UsingFunctionUrl"] = True
 
-    if 'httpMethod' in oEventObject:
-        oRequestContext["HttpMethod"] = oEventObject['httpMethod']
-    
-    if 'rawPath' in oEventObject:
-        oRequestContext["UrlPath"] = oEventObject['rawPath']
-        oRequestContext["UsingFunctionUrl"] = True
-    elif 'path' in oEventObject:
-        oRequestContext["UrlPath"] = oEventObject['path']
-            
-    return oRequestContext
+    # Check for request context details
+    if 'requestContext' in event:
+        if 'http' in event['requestContext']:
+            request_context["HttpMethod"] = event['requestContext']['http']['method']
+            request_context["UsingFunctionUrl"] = True
 
-def getPathValue(sRawPath, nPathIndex):
-    sRawPathList = sRawPath.split('?')
-    sRawPathList = sRawPathList[0].split('/')
-    return sRawPathList[nPathIndex]
+    # Fallback to 'httpMethod' if available
+    if 'httpMethod' in event:
+        request_context["HttpMethod"] = event['httpMethod']
 
-def getLastPathValue(sRawPath):
-    
-    # initialize variable
-    sLastPathValue = ""
+    # Determine the URL path
+    if 'rawPath' in event:
+        request_context["UrlPath"] = event['rawPath']
+        request_context["UsingFunctionUrl"] = True
+    elif 'path' in event:
+        request_context["UrlPath"] = event['path']
 
-    sRawPathList = sRawPath.split('?')
-    sRawPathList = sRawPathList[0].split('/')
+    return request_context
 
-    sLastPathValue = sRawPathList[len(sRawPathList) - 1]
 
-    return sLastPathValue
+def get_path_value(raw_path, path_index):
+    """
+    Returns the specific segment of the path by index.
+    """
+    path_segments = raw_path.split('?')[0].split('/')
+    return path_segments[path_index]
 
-def getHeaderObject(oEventObject):
 
-    # initialize variable
-    oNewHeaderObject = {}
+def get_last_path_value(raw_path):
+    """
+    Returns the last segment of the path.
+    """
+    path_segments = raw_path.split('?')[0].split('/')
+    return path_segments[-1]
 
-    if 'headers' in oEventObject:
-        if oEventObject['headers'] != None:
-            for sHeaderName in oEventObject['headers']:
-                oNewHeaderObject[sHeaderName.lower()] = oEventObject['headers'][sHeaderName]
 
-    return oNewHeaderObject
+def get_header_object(event):
+    """
+    Converts the headers in the event object to a case-insensitive dictionary.
+    """
+    headers = {}
 
-def createResponseObject(nStatusCode, sResponseBody, bCORS):
+    if 'headers' in event and event['headers']:
+        for header_name, header_value in event['headers'].items():
+            headers[header_name.lower()] = header_value
 
-    oResponseObject = {
-        'statusCode': nStatusCode,
-        'body': sResponseBody
+    return headers
+
+
+def create_response_object(status_code, response_body, enable_cors):
+    """
+    Creates a response object with optional CORS headers.
+    """
+    response = {
+        'statusCode': status_code,
+        'body': response_body
     }
 
-    if bCORS == True:
-        oResponseObject['headers'] = {
+    if enable_cors:
+        response['headers'] = {
             'Access-Control-Allow-Headers': '*',
             'Access-Control-Allow-Methods': '*',
             'Access-Control-Allow-Origin': '*'
         }
-    
-    return oResponseObject 
+
+    return response
+
+
+def create_authorizer_response(is_authorized, error_message):
+    """
+    Creates an authorizer response with a policy document.
+    """
+    effect = "Allow" if is_authorized else "Deny"
+
+    return {
+        "principalId": "user",
+        "policyDocument": {
+            "Version": "2012-10-17",
+            "Statement": [
+                {
+                    "Action": "execute-api:Invoke",
+                    "Effect": effect,
+                    "Resource": "*"
+                }
+            ]
+        },
+        "context": {
+            "errorMessage": f"\"{error_message}\""
+        }
+    }
