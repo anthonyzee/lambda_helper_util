@@ -75,14 +75,13 @@ def create_response_object(status_code, response_body, enable_cors):
 
     return response
 
-
 def create_authorizer_response(is_authorized, error_message):
     """
-    Creates an authorizer response with a policy document.
+    Creates an authorizer response with a policy document. Only work in Request Authorizer
     """
     effect = "Allow" if is_authorized else "Deny"
 
-    return {
+    authorizer_response = {
         "principalId": "user",
         "policyDocument": {
             "Version": "2012-10-17",
@@ -93,8 +92,19 @@ def create_authorizer_response(is_authorized, error_message):
                     "Resource": "*"
                 }
             ]
-        },
-        "context": {
-            "errorMessage": f"\"{error_message}\""
         }
     }
+
+    if error_message != "":
+        authorizer_response["context"] = {}
+        authorizer_response["context"]["errorMessage"] = f"\"{error_message}\""
+
+    return authorizer_response
+
+def is_dev(event):
+
+    if 'headers' in event and event['headers']:
+        if 'x-dev' in event['headers']:
+            return True 
+    
+    return False
